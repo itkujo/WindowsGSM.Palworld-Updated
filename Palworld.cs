@@ -22,24 +22,24 @@ namespace WindowsGSM.Plugins
             author = "itkujo",
             description = "WindowsGSM plugin for supporting Palworld Dedicated Server",
             version = "1.0",
-            url = "https://github.com/ohmcodes/WindowsGSM.Palworld", // Github repository link (Best practice)
-            color = "#1E8449" // Color Hex
+            url = "https://github.com/itkujo/WindowsGSM.Palworld-Updated", // Github repository link (Best practice)
+            color = "#34c9eb" // Color Hex
         };
 
+        // - Settings properties for SteamCMD installer
+        public override bool loginAnonymous => true; // As of 25.18, login is no longer needed. Source: https://discord.com/channels/729837326120910915/735188487615283232/1167603768091754537
+        public override string AppId => "2394010"; // Game server app
+		
         // - Standard Constructor and properties
         public Palworld(ServerConfig serverData) : base(serverData) => base.serverData = _serverData = serverData;
         private readonly ServerConfig _serverData;
         public string Error, Notice;
 
-        // - Settings properties for SteamCMD installer
-        public override bool loginAnonymous => true;
-        public override string AppId => "2394010"; /* taken via https://steamdb.info/app/2394010/info/ */
-
         // - Game server Fixed variables
         public override string StartPath => @"Pal\Binaries\Win64\PalServer-Win64-Test-Cmd.exe"; // Game server start path 
         public string FullName = "Palworld Dedicated Server"; // Game server FullName
         public bool AllowsEmbedConsole = true;  // Does this server support output redirect?
-        public int PortIncrements = 1; // This tells WindowsGSM how many ports should skip after installation
+        public int PortIncrements = 3; // This tells WindowsGSM how many ports should skip after installation
         public object QueryMethod = new A2S(); // Query method should be use on current server type. Accepted value: null or new A2S() or new FIVEM() or new UT3()
 
         // - Game server default values
@@ -51,13 +51,10 @@ namespace WindowsGSM.Plugins
         public string Additional = "EpicApp=PalServer -useperfthreads -NoAsyncLoadingThread -UseMultithreadForDS";
 
 
-        private Dictionary<string, string> configData = new Dictionary<string, string>();
-
-
         // - Create a default cfg for the game server after installation
         public async void CreateServerCFG()
         {
-
+			 //No config file seems
         }
 
         // - Start server function, return its Process to WindowsGSM
@@ -70,78 +67,113 @@ namespace WindowsGSM.Plugins
                 return null;
             }
 
-            string param = $" {_serverData.ServerParam} ";
-			param += $"-publicip=\"{_serverData.ServerIP}\" ";
-            param += $"-port={_serverData.ServerPort} ";
-            param += $"-publicport={_serverData.ServerPort} ";
-            param += $"-queryport={_serverData.ServerQueryPort} ";
-			param += $"-publicqueryport={_serverData.ServerQueryPort} ";
-            param += $"-players={_serverData.ServerMaxPlayer} ";
-            param += $"-servername=\"\"\"{_serverData.ServerName}\"\"\"";
+            var param = new StringBuilder();
 
-            // Prepare Process
-            var p = new Process
+            if (!string.IsNullOrWhiteSpace(_serverData.ServerMap))
+                param.Append($" {_serverData.ServerMap}");
+
+            param.Append("?listen");
+
+            if (!string.IsNullOrWhiteSpace(_serverData.ServerName))
+                param.Append($"?SessionName=\"\"\"{_serverData.ServerName}\"\"\"");
+
+            if (!string.IsNullOrWhiteSpace(_serverData.ServerIP))
+                param.Append($"?MultiHome={_serverData.ServerIP}");
+
+            if (!string.IsNullOrWhiteSpace(_serverData.ServerPort))
+                param.Append($"?Port={_serverData.ServerPort}");
+
+            if (!string.IsNullOrWhiteSpace(_serverData.ServerQueryPort))
+                param.Append($"?QueryPort={_serverData.ServerQueryPort}");
+
+            if (!string.IsNullOrWhiteSpace(_serverData.ServerMaxPlayer))
+                param.Append($"?MaxPlayers={_serverData.ServerMaxPlayer}");
+
+            if (!string.IsNullOrWhiteSpace(_serverData.ServerParam))
+                if(_serverData.ServerParam.StartsWith("?"))
+                    param.Append($"{_serverData.ServerParam}");
+                else if (_serverData.ServerParam.StartsWith("-"))
+                    param.Append($" {_serverData.ServerParam}");
+
+            if (!string.IsNullOrWhiteSpace(_serverData.ServerMaxPlayer))
+                param.Append($" -WinLiveMaxPlayers={_serverData.ServerMaxPlayer}");
+
+            Process p;
+            if (!AllowsEmbedConsole)
             {
-                StartInfo =
+                p = new Process
                 {
-                    WorkingDirectory = ServerPath.GetServersServerFiles(_serverData.ServerID),
-                    FileName = shipExePath,
-                    Arguments = param.ToString(),
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                    UseShellExecute = false
-
-                },
-                EnableRaisingEvents = true
-            };
-
-            // Set up Redirect Input and Output to WindowsGSM Console if EmbedConsole is on
-            if (AllowsEmbedConsole)
+                    StartInfo =
+                    {
+                        FileName = shipExePath,
+                        Arguments = param.ToString(),
+                        WindowStyle = ProcessWindowStyle.Minimized,
+                        UseShellExecute = false
+                    },
+                    EnableRaisingEvents = true
+                };
+                p.Start();
+            }
+            else
             {
-                p.StartInfo.CreateNoWindow = true;
-                p.StartInfo.RedirectStandardInput = true;
-                p.StartInfo.RedirectStandardOutput = true;
-                p.StartInfo.RedirectStandardError = true;
-                var serverConsole = new ServerConsole(_serverData.ServerID);
+                p = new Process
+                {
+                    StartInfo =
+                    {
+                        FileName = shipExePath,
+                        Arguments = param.ToString(),
+                        WindowStyle = ProcessWindowStyle.Hidden,
+                        CreateNoWindow = false,
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    },
+                    EnableRaisingEvents = true
+                };
+                var serverConsole = new Functions.ServerConsole(_serverData.ServerID);
                 p.OutputDataReceived += serverConsole.AddOutput;
                 p.ErrorDataReceived += serverConsole.AddOutput;
-            }
-
-            // Start Process
-            try
-            {
                 p.Start();
-                if (AllowsEmbedConsole)
-                {
-                    p.BeginOutputReadLine();
-                    p.BeginErrorReadLine();
-                }
+                p.BeginOutputReadLine();
+                p.BeginErrorReadLine();
+            }
 
-                return p;
-            }
-            catch (Exception e)
-            {
-                Error = e.Message;
-                return null; // return null if fail to start
-            }
+            return p;
         }
+
 
         // - Stop server function
         public async Task Stop(Process p)
         {
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
-                Functions.ServerConsole.SetMainWindow(p.MainWindowHandle);
-                Functions.ServerConsole.SendWaitToMainWindow("^c");
+                if (p.StartInfo.CreateNoWindow)
+                {
+                    p.CloseMainWindow();
+                }
+                else
+                {
+                    Functions.ServerConsole.SetMainWindow(p.MainWindowHandle);
+                    Functions.ServerConsole.SendWaitToMainWindow("quit");
+                    Functions.ServerConsole.SendWaitToMainWindow("{ENTER}");
+                    await Task.Delay(6000);
+                }
             });
-            await Task.Delay(2000);
         }
 
-        // - Update server function
+        public async Task<Process> Install()
+        {
+            var steamCMD = new Installer.SteamCMD();
+            Process p = await steamCMD.Install(_serverData.ServerID, string.Empty, AppId, true, loginAnonymous);
+            Error = steamCMD.Error;
+
+            return p;
+        }
+
         public async Task<Process> Update(bool validate = false, string custom = null)
         {
-            var (p, error) = await Installer.SteamCMD.UpdateEx(serverData.ServerID, AppId, validate, custom: custom, loginAnonymous: loginAnonymous);
+            var (p, error) = await Installer.SteamCMD.UpdateEx(_serverData.ServerID, AppId, validate, custom: custom, loginAnonymous: loginAnonymous);
             Error = error;
-            await Task.Run(() => { p.WaitForExit(); });
             return p;
         }
 
@@ -152,9 +184,9 @@ namespace WindowsGSM.Plugins
 
         public bool IsImportValid(string path)
         {
-            string exePath = Path.Combine(path, "PackageInfo.bin");
-            Error = $"Invalid Path! Fail to find {Path.GetFileName(exePath)}";
-            return File.Exists(exePath);
+            string importPath = Path.Combine(path, StartPath);
+            Error = $"Invalid Path! Fail to find {Path.GetFileName(StartPath)}";
+            return File.Exists(importPath);
         }
 
         public string GetLocalBuild()
@@ -168,5 +200,6 @@ namespace WindowsGSM.Plugins
             var steamCMD = new Installer.SteamCMD();
             return await steamCMD.GetRemoteBuild(AppId);
         }
+
     }
 }
