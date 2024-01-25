@@ -48,7 +48,7 @@ namespace WindowsGSM.Plugins
         public string Maxplayers = "32"; // WGSM reads this as string but originally it is number or int (MaxPlayers)
         public string Port = "8211"; // WGSM reads this as string but originally it is number or int
         public string QueryPort = "8212"; // WGSM reads this as string but originally it is number or int (SteamQueryPort)
-        public string Additional = "EpicApp=PalServer -useperfthreads -NoAsyncLoadingThread -UseMultithreadForDS";
+        public string Additional = "EpicApp=PalServer?-useperfthreads?-NoAsyncLoadingThread?-UseMultithreadForDS";
 
 
         // - Create a default cfg for the game server after installation
@@ -75,19 +75,19 @@ namespace WindowsGSM.Plugins
             param.Append("?listen");
 
             if (!string.IsNullOrWhiteSpace(_serverData.ServerName))
-                param.Append($"?SessionName=\"\"\"{_serverData.ServerName}\"\"\"");
+                param.Append($"?servername=\"\"\"{_serverData.ServerName}\"\"\"");
 
             if (!string.IsNullOrWhiteSpace(_serverData.ServerIP))
-                param.Append($"?MultiHome={_serverData.ServerIP}");
+                param.Append($"?publicip={_serverData.ServerIP}");
 
             if (!string.IsNullOrWhiteSpace(_serverData.ServerPort))
-                param.Append($"?Port={_serverData.ServerPort}");
+                param.Append($"?publicport={_serverData.ServerPort}");
 
             if (!string.IsNullOrWhiteSpace(_serverData.ServerQueryPort))
-                param.Append($"?QueryPort={_serverData.ServerQueryPort}");
+                param.Append($"?queryport={_serverData.ServerQueryPort}");
 
             if (!string.IsNullOrWhiteSpace(_serverData.ServerMaxPlayer))
-                param.Append($"?MaxPlayers={_serverData.ServerMaxPlayer}");
+                param.Append($"?players={_serverData.ServerMaxPlayer}");
 
             if (!string.IsNullOrWhiteSpace(_serverData.ServerParam))
                 if(_serverData.ServerParam.StartsWith("?"))
